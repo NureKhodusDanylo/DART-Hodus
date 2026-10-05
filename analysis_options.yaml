@@ -1,0 +1,20 @@
+# Набір правил: package:lints/recommended.yaml + суворіші налаштування.
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    - public_member_api_docs
+    - prefer_final_locals
+    - prefer_final_in_for_each
+    - prefer_single_quotes
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - directives_ordering
+    - prefer_const_declarations
+    - unnecessary_lambdas
