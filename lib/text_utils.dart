@@ -17,9 +17,6 @@ final RegExp isoDatePattern = RegExp(
 /// Шаблон цифри, за якою йде ще хоча б одна цифра (усі, крім останньої).
 final RegExp _maskableDigit = RegExp(r'\d(?=\d)');
 
-/// Перевіряє, чи відповідає [id] формату ідентифікатора завдання.
-bool isValidTaskId(String id) => taskIdPattern.hasMatch(id);
-
 /// Повертає код проєкту з ідентифікатора [id] або `null`,
 /// якщо формат некоректний.
 String? projectFromId(String id) =>
