@@ -1,6 +1,6 @@
 name: task_planner
-description: Консольний планувальник завдань — розбір, перевірка та агрегація записів.
-version: 1.0.0
+description: Планувальник завдань — обʼєктно-орієнтована модель предметної області.
+version: 2.0.0
 publish_to: none
 
 environment:
