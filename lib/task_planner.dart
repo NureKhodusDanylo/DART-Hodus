@@ -1,14 +1,18 @@
-/// Планувальник завдань: розбір, перевірка та агрегація записів
-/// без використання класів (лабораторна робота 1).
+/// Планувальник завдань: об'єктно-орієнтована модель предметної
+/// області (лабораторна робота 2).
 library;
 
-export 'closures.dart';
+export 'analytics.dart';
 export 'constants.dart';
 export 'data.dart';
-export 'dates.dart';
-export 'model.dart';
-export 'parsing.dart';
-export 'pipelines.dart';
+export 'extensions.dart';
+export 'identifiable.dart';
+export 'milestone.dart';
+export 'priority.dart';
+export 'project.dart';
 export 'report.dart';
+export 'repository.dart';
+export 'scheduled.dart';
+export 'task.dart';
+export 'task_status.dart';
 export 'text_utils.dart';
-export 'validation.dart';

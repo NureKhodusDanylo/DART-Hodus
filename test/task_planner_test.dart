@@ -2,60 +2,79 @@ import 'package:task_planner/task_planner.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('parseLine', () {
-    test('розбирає коректний рядок', () {
-      final result = parseLine(rawTasks.first);
-      expect(result.error, isNull);
-      expect(result.task?.id, 'WEB-101');
-      expect(result.task?.estimateHours, 12);
+  group('Task', () {
+    test('tryParse розбирає коректний рядок', () {
+      final (:task, :error) = Task.tryParse(rawTasks.first);
+      expect(error, isNull);
+      expect(task?.priority, Priority.medium);
+      expect(task?.status, const Done());
     });
 
-    test('відхиляє рядок із відсутнім полем', () {
-      expect(parseLine('A-1;x;A;1;2026-01-01;todo;1').error, isNotNull);
-    });
-
-    test('відхиляє неіснуючу дату', () {
+    test('пріоритет поза 1..5 і невідомий стан не розбираються', () {
       expect(
-        parseLine('API-1;x;API;1;2026-09-31;2026-10-01;todo;1').error,
-        contains('дата'),
+        Task.tryParse('WEB-1;x;WEB;9;2026-01-01;2026-02-01;todo;1').error,
+        contains('пріоритету'),
+      );
+      expect(
+        Task.tryParse('WEB-1;x;WEB;1;2026-01-01;2026-02-01;review;1').error,
+        contains('стан'),
       );
     });
 
-    test('рівно 4 пошкоджені рядки у вхідних даних', () {
+    test('fromCsv кидає FormatException на пошкоджений рядок', () {
+      expect(() => Task.fromCsv('a;b'), throwsFormatException);
+    });
+
+    test('рівність за значенням і робота в Set', () {
+      final a = Task.fromCsv(rawTasks.first);
+      final b = Task.fromCsv(rawTasks.first);
+      expect(identical(a, b), isFalse);
+      expect(a, b);
+      expect({a, b}, hasLength(1));
+    });
+
+    test('фабричний конструктор повертає кешований екземпляр', () {
       expect(
-        rawTasks.map(parseLine).where((r) => r.task == null),
-        hasLength(4),
+        identical(Task.cached(rawTasks[1]), Task.cached(rawTasks[1])),
+        isTrue,
       );
     });
-  });
 
-  group('validateTask', () {
-    test('знаходить усі порушення', () {
-      final task = parseLine(rawTasks.last).task;
-      expect(task, isNotNull);
-      if (task != null) expect(validateTask(task), hasLength(4));
+    test('порушення узгодженості', () {
+      final task = Task.fromCsv(rawTasks.last);
+      expect(task.violations, hasLength(2));
     });
   });
 
-  group('конвеєри', () {
-    final tasks = rawTasks
-        .map(parseLine)
-        .map((r) => r.task)
-        .nonNulls
-        .where(isValidTask)
-        .toList();
+  group('модель', () {
+    final now = DateTime.utc(2026, 10, 15);
+    final tasks = [
+      for (final line in rawTasks)
+        if (Task.tryParse(line).task case final Task t when t.isValid) t,
+    ];
 
-    test('групування за проєктом', () {
-      expect(groupByProject(tasks).keys, containsAll(['WEB', 'MOB', 'API']));
+    test('13 коректних завдань', () => expect(tasks, hasLength(13)));
+
+    test('Repository знаходить за id', () {
+      final repo = Repository<Task>.of(tasks);
+      expect(repo.findById('API-305')?.status, const Blocked());
+      expect(repo.findById('NOPE-1'), isNull);
     });
 
-    test('сортування за спаданням пріоритету', () {
-      final sorted = sortTasks(tasks, ascending: false);
-      expect(sorted.first.priority, maxPriority);
+    test('домішка Scheduled однаково працює для віхи', () {
+      final m = Milestone('M-1', 'Реліз', DateTime.utc(2026, 10, 20));
+      expect(m.daysLeft(now), 5);
+      expect(m.isOverdue(now), isFalse);
     });
 
-    test('маскування ідентифікатора', () {
-      expect(maskTaskId('WEB-101'), 'WEB-**1');
+    test('охоронець when у зіставленні зі зразком', () {
+      final overdueCritical = tasks.firstWhere((t) => t.id == 'WEB-103');
+      expect(urgencyOf(overdueCritical, now), 'КРИТИЧНО: прострочено');
+    });
+
+    test('записи: progressOf', () {
+      final (:done, :open, remainingHours: _) = progressOf(tasks);
+      expect((done, open), (3, 10));
     });
   });
 }
