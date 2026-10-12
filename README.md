@@ -27,7 +27,7 @@ dart test
 |---|---|---|
 | `Identifiable` | `interface class` | Контракт «має `id`» для узагальненого сховища |
 | `Entity` | абстрактний клас | Спільна база сутностей: `id`, `displayName`, `toString` |
-| `Task` | `final class` | Незмінне завдання: `const`-конструктор, `fromCsv`, фабричний `cached`, `==`/`hashCode` |
+| `Task` | `final class` | Незмінне завдання: первинний `const`-конструктор, `fromCsv`, фабричний `cached`, `==`/`hashCode` |
 | `Project` | `final class` | Проєкт без терміну, класичний `const`-конструктор |
 | `Milestone` | `final class` | Віха з терміном, оголошена первинним конструктором (Dart 3.13) |
 | `Scheduled` | `mixin … on Entity` | Термін, дні до терміну, прострочення — для `Task` і `Milestone` |

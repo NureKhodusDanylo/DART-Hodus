@@ -2,6 +2,7 @@
 /// зі зразком.
 library;
 
+import 'constants.dart';
 import 'priority.dart';
 import 'task.dart';
 import 'task_status.dart';
@@ -54,6 +55,6 @@ String urgencyOf(Task task, DateTime now) => switch (task) {
     'КРИТИЧНО: прострочено',
   _ when task.isOverdue(now) => 'прострочено',
   Task(priority: Priority.critical) => 'критичний пріоритет',
-  _ when task.daysLeft(now) <= 7 => 'термін близько',
+  _ when task.daysLeft(now) <= dueSoonWindow.inDays => 'термін близько',
   _ => 'за планом',
 };

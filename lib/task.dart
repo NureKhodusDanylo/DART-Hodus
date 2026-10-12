@@ -17,18 +17,31 @@ typedef ParseResult = ({Task? task, String? error});
 /// Усі поля `final`, конструктор генеративний і константний. Рівність
 /// визначається за значенням усіх полів, тому [==] і [hashCode]
 /// перевизначено разом.
-final class Task extends Entity with Scheduled {
+final class const Task({
+  required String id,
+
+  /// Назва завдання.
+  required final String title,
+
+  /// Код проєкту, до якого належить завдання.
+  required final String project,
+
+  /// Пріоритет.
+  required final Priority priority,
+
+  /// Дата створення (UTC).
+  required final DateTime createdAt,
+
+  @override required final DateTime deadline,
+
+  /// Поточний стан.
+  required final TaskStatus status,
+
+  /// Оцінка трудомісткості в годинах.
+  required final double estimateHours,
+}) extends Entity with Scheduled {
   /// Створює завдання з уже перевіреними значеннями полів.
-  const Task({
-    required String id,
-    required this.title,
-    required this.project,
-    required this.priority,
-    required this.createdAt,
-    required this.deadline,
-    required this.status,
-    required this.estimateHours,
-  }) : super(id);
+  this : super(id);
 
   /// Розбирає рядок [line] у завдання; кидає [FormatException],
   /// якщо рядок пошкоджений.
@@ -61,27 +74,6 @@ final class Task extends Entity with Scheduled {
 
   /// Кеш завдань, створених фабричним конструктором [Task.cached].
   static final Map<String, Task> _cache = {};
-
-  /// Назва завдання.
-  final String title;
-
-  /// Код проєкту, до якого належить завдання.
-  final String project;
-
-  /// Пріоритет.
-  final Priority priority;
-
-  /// Дата створення (UTC).
-  final DateTime createdAt;
-
-  @override
-  final DateTime deadline;
-
-  /// Поточний стан.
-  final TaskStatus status;
-
-  /// Оцінка трудомісткості в годинах.
-  final double estimateHours;
 
   /// Розбирає рядок [line] без винятків.
   ///
