@@ -1,6 +1,6 @@
 name: task_planner
-description: Планувальник завдань — обʼєктно-орієнтована модель предметної області.
-version: 2.0.0
+description: Планувальник завдань — модель предметної області з асинхронним шаром.
+version: 3.0.0
 publish_to: none
 
 environment:
