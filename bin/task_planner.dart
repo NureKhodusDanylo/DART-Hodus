@@ -1,127 +1,245 @@
+import 'dart:async';
+import 'dart:isolate';
+
 import 'package:task_planner/task_planner.dart';
 
-/// Точка входу: будує об'єктну модель завдань і демонструє її можливості.
-///
-/// Необов'язковий аргумент — дата звіту у форматі `РРРР-ММ-ДД`
-/// (за замовчуванням — поточна дата).
-void main(List<String> arguments) {
-  final now = arguments.firstOrNull?.toStrictDate() ?? DateTime.now().dateOnly;
+/// Кількість синтетичних завдань для важкого обчислення.
+const int _workloadSize = 3000000;
 
-  // 1. Розбір рядків у об'єкти.
-  _section('1. Розбір рядків: Task.tryParse');
-  final parsed = [
-    for (final line in rawTasks) (line: line, result: Task.tryParse(line)),
+/// Період таймера, яким перевіряється, чи вільний цикл подій.
+const Duration _tick = Duration(milliseconds: 10);
+
+/// Точка входу: демонструє асинхронний шар, потоки та ізоляти.
+Future<void> main() async {
+  final tasks = [
+    for (final line in rawTasks)
+      if (Task.tryParse(line).task case final Task t when t.isValid) t,
   ];
-  for (final (:line, :result) in parsed) {
-    if (result case (task: null, :final String error)) {
-      print('  ✗ $error\n      ← $line');
+
+  // 1. Асинхронне сховище.
+  _section('1. Асинхронне сховище');
+  final repo = AsyncRepository<Task>();
+  await repo.saveAll(tasks);
+  print('Збережено: ${(await repo.loadAll()).length} завдань');
+  print('load(API-305) → ${await repo.load('API-305')}');
+  print('delete(DOC-402) → ${await repo.delete('DOC-402')}');
+  print('load(DOC-402) → ${await repo.load('DOC-402')}');
+
+  // 2. Забутий await.
+  _section('2. Забутий await');
+  final pending = repo.load('WEB-101');
+  print('Без await: ${pending.toString()}');
+  print('З await:   ${await pending}');
+  final draft = Task.fromCsv(
+    'WEB-108;Сторінка помилки 404;WEB;2;2026-10-15;2026-11-05;todo;3',
+  );
+  // Навмисно «забутий» await: unawaited лише робить намір явним для лінтера.
+  unawaited(repo.save(draft));
+  print(
+    'Одразу після save без await: '
+    '${await repo.load(draft.id, delay: Duration.zero)}',
+  );
+  await Future<void>.delayed(repo.latency);
+  print(
+    'Через ${repo.latency.inMilliseconds} мс: ${await repo.load(draft.id)}',
+  );
+
+  // 3. Послідовно чи одночасно.
+  _section('3. Послідовне й одночасне виконання');
+  final sequential = await measure(() async {
+    await slowOperation('A');
+    await slowOperation('B');
+    await slowOperation('C');
+  });
+  final concurrent = await measure(
+    () => Future.wait([
+      slowOperation('A'),
+      slowOperation('B'),
+      slowOperation('C'),
+    ]),
+  );
+  print('Послідовно (3 × await):  ${sequential.elapsed.inMilliseconds} мс');
+  print('Одночасно (Future.wait): ${concurrent.elapsed.inMilliseconds} мс');
+
+  // 4. Помилка в групі операцій.
+  _section('4. Помилка в групі: Future.wait і .wait');
+  try {
+    await Future.wait([
+      slowOperation('A'),
+      slowOperation('B', fail: true),
+      slowOperation('C'),
+    ]);
+  } on StateError catch (e) {
+    print('Future.wait: $e');
+    print('  результати A і C недоступні');
+  }
+  try {
+    await [
+      slowOperation('A'),
+      slowOperation('B', fail: true),
+      slowOperation('C'),
+    ].wait;
+  } on ParallelWaitError<List<String?>, List<AsyncError?>> catch (e) {
+    print('.wait: ParallelWaitError');
+    print('  values = ${e.values}');
+    print('  errors = ${e.errors.map((err) => err?.error)}');
+  }
+
+  // 5. Неспіймана асинхронна помилка.
+  _section('5. try/catch навколо виклику без await');
+  final zoneDone = Completer<void>();
+  runZonedGuarded(
+    () {
+      try {
+        unawaited(slowOperation('D', delay: _tick, fail: true));
+        print('try завершився без винятку');
+      } on StateError catch (e) {
+        print('catch спіймав: $e');
+      }
+    },
+    (error, stack) {
+      print('Помилку спіймала лише зона: $error');
+      zoneDone.complete();
+    },
+  );
+  await zoneDone.future;
+
+  // 6. Лінивий генератор async*.
+  _section('6. Генератор async* і await for');
+  final stream = repo.watchAll(
+    onStart: () => print('  [генератор] почав виконувати тіло'),
+  );
+  print('Потік створено, підписки ще немає');
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  print('Підписуємось через await for');
+  await for (final t in stream.take(3)) {
+    print('  отримано ${t.id}');
+  }
+
+  // 7. StreamController: події до підписки та явне скасування.
+  _section('7. StreamController і StreamSubscription');
+  final source = TaskEventSource();
+  source
+    ..emit(TaskCreated(draft))
+    ..emit(const StatusChanged('WEB-108', Todo(), InProgress()))
+    ..emit(const StatusChanged('WEB-108', InProgress(), Done()));
+  print('Три події додано до підписки');
+  final received = <TaskEvent>[];
+  final subscription = source.stream.listen(received.add);
+  source.emit(const TaskDeleted('WEB-108'));
+  await Future<void>.delayed(Duration.zero);
+  await subscription.cancel();
+  print('Отримано після підписки: $received');
+  await source.close();
+
+  // 8. Помилка посередині потоку.
+  _section('8. Помилка в потоці: await for і listen(cancelOnError: false)');
+  try {
+    await for (final e in _streamWithError()) {
+      print('  await for: $e');
     }
+  } on StateError catch (e) {
+    print('  await for зупинився: $e');
   }
-  final candidates = [
-    for (final p in parsed)
-      if (p.result.task case final Task task) task,
-  ];
-  print('Розібрано ${candidates.length} з ${rawTasks.length}');
-
-  // 2. Перевірка узгодженості полів.
-  _section('2. Перевірка правил узгодженості');
-  for (final task in candidates.where((t) => !t.isValid)) {
-    print('  ${task.id}:');
-    for (final v in task.violations) {
-      print('      - $v');
-    }
-  }
-  final repo = Repository<Task>.of(candidates.where((t) => t.isValid));
-  print('У сховищі: ${repo.length} коректних завдань');
-
-  // 3. Конструктори та рівність.
-  _section('3. Конструктори, == і hashCode');
-  final line = rawTasks.first;
-  final a = Task.fromCsv(line);
-  final b = Task.fromCsv(line);
-  print('fromCsv двічі: identical = ${identical(a, b)}, == ${a == b}');
-  print(
-    'cached двічі: identical = '
-    '${identical(Task.cached(line), Task.cached(line))}',
+  final listenDone = Completer<void>();
+  final tolerant = _streamWithError().listen(
+    (e) => print('  listen: $e'),
+    onError: (Object e) => print('  listen onError: $e'),
+    onDone: listenDone.complete,
+    cancelOnError: false,
   );
-  print('Set з двох однакових завдань: розмір ${{a, b}.length}');
-  print(
-    'Змінений стан: ${a.withStatus(const Todo()) == a ? 'рівні' : 'різні'}',
-  );
-  print(a);
+  await listenDone.future;
+  await tolerant.cancel();
 
-  // 4. Узагальнене сховище.
-  _section('4. Узагальнене сховище Repository<T>');
-  final projects = Repository<Project>.of(knownProjects);
-  print('Проєктів: ${projects.length}, MOB → ${projects.findById('MOB')}');
-  print('Завдання API-305 → ${repo.findById('API-305')}');
-  print('Завдання XYZ-1 → ${repo.findById('XYZ-1') ?? 'не знайдено'}');
-
-  // 5. Запечатана ієрархія станів.
-  _section('5. Запечатана ієрархія TaskStatus');
-  for (final status in const [Todo(), InProgress(), Done(), Blocked()]) {
-    final count = repo.where((t) => t.status == status).length;
-    print(
-      '  ${statusMark(status)} ${status.label.padRight(22)} '
-      'прогрес ${(status.progress * 100).round()}%, завдань: $count',
-    );
+  // 9. Одноразова і широкомовна підписка.
+  _section('9. Одноразовий і широкомовний потоки');
+  final single = TaskEventSource();
+  final first = single.stream.listen((_) {});
+  try {
+    single.stream.listen((_) {});
+  } on StateError catch (e) {
+    print('Друга підписка на одноразовий потік: $e');
   }
+  await first.cancel();
+  await single.close();
 
-  // 6. Домішка Scheduled у різних гілках ієрархії.
-  _section('6. Домішка Scheduled: завдання і віхи');
-  final milestones = [
-    Milestone('M-1', 'Бета-реліз вебзастосунку', DateTime.utc(2026, 10, 30)),
-    Milestone(
-      'M-2',
-      'Демонстрація замовнику',
-      DateTime.utc(2026, 10, 10),
-      reached: true,
-    ),
-  ];
-  final scheduled = <Scheduled>[
-    ...repo.where((t) => t.project == 'WEB'),
-    ...milestones,
-  ];
-  for (final item in scheduled) {
-    print('  ${item.deadlineNote(now)}');
-  }
+  final broadcast = TaskEventSource(broadcast: true);
+  broadcast.emit(const TaskDeleted('ДО-ПІДПИСКИ'));
+  final heardA = <TaskEvent>[];
+  final heardB = <TaskEvent>[];
+  final subA = broadcast.stream.listen(heardA.add);
+  final subB = broadcast.stream.listen(heardB.add);
+  broadcast.emit(const TaskDeleted('API-302'));
+  await Future<void>.delayed(Duration.zero);
+  print('Широкомовний: слухач A $heardA, слухач B $heardB');
+  await subA.cancel();
+  await subB.cancel();
+  await broadcast.close();
 
-  // 7. Методи розширення.
-  _section('7. Методи розширення');
-  print(
-    'Сьогодні: ${now.iso}, до 2026-12-31: ${now.daysUntil(DateTime.utc(2026, 12, 31))} дн.',
+  // 10. Конвеєр трансформації потоку.
+  _section('10. Конвеєр where → map → take');
+  final changes = await _eventsFeed()
+      .where((e) => e is StatusChanged)
+      .map((e) => 'зміна стану: $e')
+      .take(2)
+      .toList();
+  changes.forEach(print);
+
+  // 11. Ізолят.
+  _section('11. Важке обчислення: головний ізолят та Isolate.run');
+  final syncRun = await _measureTicks(
+    () async => simulateWorkload(_workloadSize),
   );
   print(
-    'Усього: ${formatHours(repo.all.totalHours)}, '
-    'залишок: ${formatHours(repo.all.remainingHours)}',
+    'У головному ізоляті: ${syncRun.elapsed.inMilliseconds} мс, '
+    'тиків таймера за цей час: ${syncRun.ticks}',
   );
-  for (final MapEntry(:key, :value) in repo.all.groupByProject().entries) {
-    print('  $key: ${value.length} завд., ${formatHours(value.totalHours)}');
-  }
-
-  // 8. Перелічення з членами.
-  _section('8. Перелічення Priority');
-  for (final p in Priority.values.reversed) {
-    final ids = repo.where((t) => t.priority == p).map((t) => t.id);
-    print(
-      '  ${p.level} ${p.label.padRight(10)} високий: ${p.isHigh ? 'так' : 'ні '}  ${ids.join(', ')}',
-    );
-  }
-
-  // 9. Записи та зіставлення зі зразком.
-  _section('9. Записи та зіставлення зі зразком');
-  final (:done, :open, :remainingHours) = progressOf(repo.all);
+  final isolateRun = await _measureTicks(
+    () => Isolate.run(() => simulateWorkload(_workloadSize)),
+  );
   print(
-    'Виконано $done, відкрито $open, залишок з урахуванням стану: '
-    '${formatHours(remainingHours)}',
+    'В Isolate.run:       ${isolateRun.elapsed.inMilliseconds} мс, '
+    'тиків таймера за цей час: ${isolateRun.ticks}',
   );
-  for (final t in repo.all.byUrgency().take(6)) {
-    print('  ${t.id.padRight(8)} ${urgencyOf(t, now)}');
-  }
+  print('Результати збігаються: ${syncRun.value == isolateRun.value}');
+  print('  ${syncRun.value}');
+  print(
+    'simulateWorkload запускалась двічі, а simulationRuns у головному '
+    'ізоляті = $simulationRuns: інкремент в Isolate.run змінив копію змінної',
+  );
+}
 
-  // 10. Звіт.
-  _section('10. Звіт');
-  print(buildReport(repo.all, now: now));
+/// Потік із трьох подій, друга з яких — помилка.
+Stream<TaskEvent> _streamWithError() {
+  final source = TaskEventSource()
+    ..emit(const TaskDeleted('A-1'))
+    ..fail(StateError('збій джерела подій'))
+    ..emit(const TaskDeleted('A-2'));
+  // close() завершиться, коли слухач дочитає потік, тому тут не чекаємо.
+  unawaited(source.close());
+  return source.stream;
+}
+
+/// Потік подій планувальника різних типів.
+Stream<TaskEvent> _eventsFeed() async* {
+  yield const TaskDeleted('DOC-402');
+  yield const StatusChanged('WEB-102', InProgress(), Done());
+  yield const TaskDeleted('API-302');
+  yield const StatusChanged('API-305', Blocked(), InProgress());
+  yield const StatusChanged('MOB-202', Todo(), InProgress());
+}
+
+/// Виконує [action], вимірюючи час і кількість спрацювань періодичного
+/// таймера — показник того, чи був вільний цикл подій.
+Future<({WorkloadSummary value, Duration elapsed, int ticks})> _measureTicks(
+  Future<WorkloadSummary> Function() action,
+) async {
+  var ticks = 0;
+  final timer = Timer.periodic(_tick, (_) => ticks++);
+  final (:value, :elapsed) = await measure(action);
+  await Future<void>.delayed(Duration.zero);
+  timer.cancel();
+  return (value: value, elapsed: elapsed, ticks: ticks);
 }
 
 /// Друкує заголовок розділу [title].
