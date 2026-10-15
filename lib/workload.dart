@@ -31,8 +31,17 @@ const int _maxSyntheticHours = 120;
 /// Горизонт термінів синтетичних завдань у днях.
 const int _deadlineHorizonDays = 90;
 
-/// Частка завдань, що вважаються простроченими (поріг для 90-го перцентиля).
+/// Перцентиль трудомісткості, що обчислюється (90-й).
 const double _percentile = 0.9;
+
+/// Скільки дробових кроків має година трудомісткості (крок 0,1 год).
+const int _hourFractions = 10;
+
+/// На скільки днів у минуле може бути зсунутий термін (прострочені завдання).
+const int _pastDeadlineDays = 30;
+
+/// Зерно генератора псевдовипадкових чисел за замовчуванням.
+const int defaultWorkloadSeed = 42;
 
 /// Моделює навантаження з [count] синтетичних завдань.
 ///
@@ -40,7 +49,7 @@ const double _percentile = 0.9;
 /// генератором псевдовипадкових чисел із зерном [seed], рахує суму годин,
 /// кількість прострочених і 90-й перцентиль трудомісткості (для чого
 /// сортує весь масив). Обчислення суто синхронне й навмисно важке.
-WorkloadSummary simulateWorkload(int count, {int seed = 42}) {
+WorkloadSummary simulateWorkload(int count, {int seed = defaultWorkloadSeed}) {
   simulationRuns++;
   var state = seed;
   int next() => state = (state * _lcgMultiplier + _lcgIncrement) % _lcgModulus;
@@ -49,10 +58,13 @@ WorkloadSummary simulateWorkload(int count, {int seed = 42}) {
   var total = 0.0;
   var overdue = 0;
   for (var i = 0; i < count; i++) {
-    final h = 1 + next() % _maxSyntheticHours + (next() % 10) / 10;
+    final h =
+        1 +
+        next() % _maxSyntheticHours +
+        (next() % _hourFractions) / _hourFractions;
     hours[i] = h;
     total += h;
-    final deadlineInDays = next() % _deadlineHorizonDays - 30;
+    final deadlineInDays = next() % _deadlineHorizonDays - _pastDeadlineDays;
     if (deadlineInDays < 0) overdue++;
   }
   hours.sort();
