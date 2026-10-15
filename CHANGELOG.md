@@ -1,3 +1,8 @@
+## 3.0.0
+
+- ЛР3: асинхронне сховище AsyncRepository, події на StreamController,
+  генератор async*, Isolate.run для важкого обчислення, 11 асинхронних тестів.
+
 ## 2.0.0
 
 - ЛР2: обʼєктно-орієнтована модель — клас Task, sealed TaskStatus, enum Priority,
