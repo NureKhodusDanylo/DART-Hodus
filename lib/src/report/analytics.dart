@@ -2,10 +2,10 @@
 /// зі зразком.
 library;
 
-import 'constants.dart';
-import 'priority.dart';
-import 'task.dart';
-import 'task_status.dart';
+import '../model/constants.dart';
+import '../model/priority.dart';
+import '../model/task.dart';
+import '../model/task_status.dart';
 
 /// Підсумок виконання: кількість завершених і відкритих завдань та
 /// залишок роботи в годинах — кілька значень повертаються записом.

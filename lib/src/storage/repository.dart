@@ -1,7 +1,7 @@
 /// Узагальнене сховище сутностей.
 library;
 
-import 'identifiable.dart';
+import '../model/identifiable.dart';
 
 /// Сховище сутностей, які вміють повідомляти власний ідентифікатор.
 ///

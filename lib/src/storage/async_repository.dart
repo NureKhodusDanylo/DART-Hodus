@@ -1,7 +1,7 @@
 /// Асинхронне сховище сутностей.
 library;
 
-import 'identifiable.dart';
+import '../model/identifiable.dart';
 
 /// Помилка: сутності з указаним ідентифікатором немає у сховищі.
 final class EntityNotFound implements Exception {

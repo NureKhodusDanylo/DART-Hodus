@@ -59,6 +59,38 @@ final class const Task({
   factory Task.cached(String line) =>
       _cache.putIfAbsent(line, () => Task.fromCsv(line));
 
+  /// Відновлює завдання з JSON-об'єкта [json], збереженого [toJson].
+  ///
+  /// Призначено для власного файлу даних, структуру якого гарантує
+  /// програма. `jsonDecode` повертає `dynamic`, тому кожне поле явно
+  /// приводиться до потрібного типу: помилка структури проявиться одразу
+  /// тут, а не пізніше в довільному місці коду. Неприпустимі значення
+  /// пріоритету, стану чи дати дають [FormatException].
+  factory Task.fromJson(Map<String, Object?> json) {
+    final level = json['priority'] as int;
+    final statusCode = json['status'] as String;
+    final created = json['createdAt'] as String;
+    final deadline = json['deadline'] as String;
+    return Task(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      project: json['project'] as String,
+      priority:
+          Priority.fromLevel(level) ??
+          (throw FormatException('пріоритету рівня $level не існує')),
+      createdAt:
+          created.toStrictDate() ??
+          (throw FormatException('некоректна дата створення', created)),
+      deadline:
+          deadline.toStrictDate() ??
+          (throw FormatException('некоректний термін', deadline)),
+      status:
+          TaskStatus.tryParse(statusCode) ??
+          (throw FormatException('невідомий стан', statusCode)),
+      estimateHours: (json['estimateHours'] as num).toDouble(),
+    );
+  }
+
   /// Копіює поля завдання [other] — ціль переадресації для [Task.fromCsv].
   Task._copyOf(Task other)
     : this(
@@ -167,6 +199,62 @@ final class const Task({
 
   /// Чи немає порушень правил узгодженості.
   bool get isValid => violations.isEmpty;
+
+  /// Перевіряє довільне значення [json] з ненадійного джерела (тіла
+  /// HTTP-запиту) і будує з нього завдання; `null` — якщо структура чи
+  /// значення некоректні.
+  ///
+  /// На відміну від [Task.fromJson], не кидає винятків: зіставлення зі
+  /// зразком мапи перевіряє наявність і тип кожного поля.
+  static Task? tryFromJson(Object? json) => switch (json) {
+    {
+      'id': final String id,
+      'title': final String title,
+      'project': final String project,
+      'priority': final int level,
+      'createdAt': final String created,
+      'deadline': final String deadline,
+      'status': final String status,
+      'estimateHours': final num hours,
+    } =>
+      switch ((
+        Priority.fromLevel(level),
+        created.toStrictDate(),
+        deadline.toStrictDate(),
+        TaskStatus.tryParse(status),
+      )) {
+        (
+          final Priority priority,
+          final DateTime createdAt,
+          final DateTime due,
+          final TaskStatus taskStatus,
+        ) =>
+          Task(
+            id: id,
+            title: title,
+            project: project,
+            priority: priority,
+            createdAt: createdAt,
+            deadline: due,
+            status: taskStatus,
+            estimateHours: hours.toDouble(),
+          ),
+        _ => null,
+      },
+    _ => null,
+  };
+
+  /// Перетворює завдання на JSON-сумісну мапу.
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'title': title,
+    'project': project,
+    'priority': priority.level,
+    'createdAt': createdAt.iso,
+    'deadline': deadline.iso,
+    'status': status.code,
+    'estimateHours': estimateHours,
+  };
 
   /// Копія завдання зі зміненим станом [status].
   Task withStatus(TaskStatus status) => Task(

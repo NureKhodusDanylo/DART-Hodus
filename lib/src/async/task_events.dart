@@ -3,8 +3,8 @@ library;
 
 import 'dart:async';
 
-import 'task.dart';
-import 'task_status.dart';
+import '../model/task.dart';
+import '../model/task_status.dart';
 
 /// Подія зміни в планувальнику.
 sealed class TaskEvent {

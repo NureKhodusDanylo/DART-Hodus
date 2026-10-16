@@ -1,11 +1,11 @@
 /// Форматування текстового звіту.
 library;
 
+import '../model/constants.dart';
+import '../model/extensions.dart';
+import '../model/task.dart';
+import '../model/text_utils.dart';
 import 'analytics.dart';
-import 'constants.dart';
-import 'extensions.dart';
-import 'task.dart';
-import 'text_utils.dart';
 
 /// Формує текстовий звіт за списком [items].
 ///
