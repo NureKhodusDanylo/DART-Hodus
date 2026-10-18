@@ -4,6 +4,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import '../model/priority.dart';
 import '../model/task.dart';
 
 /// Підсумок імпорту: прочитані рядки, коректні завдання й кількість помилок.
@@ -20,6 +21,12 @@ const int _sampleMaxHours = 40;
 
 /// Найбільший номер завдання в межах одного проєкту.
 const int _sampleIdRange = 10000;
+
+/// Кожен який рядок згенерованого файлу навмисно пошкоджується.
+const int _sampleBrokenEvery = 20;
+
+/// Скільки коректних завдань імпорт тримає в пам'яті за замовчуванням.
+const int defaultImportKeep = 1000;
 
 /// Розбирає CSV-файл [path] рядок за рядком.
 ///
@@ -39,7 +46,7 @@ Stream<ParseResult> readCsv(String path) =>
 /// До результату потрапляють лише завдання без порушень правил; щоб не
 /// тримати весь файл у пам'яті, зберігаються не більше [keep] завдань,
 /// решта лише підраховуються.
-Future<CsvImport> importCsv(String path, {int keep = 1000}) async {
+Future<CsvImport> importCsv(String path, {int keep = defaultImportKeep}) async {
   var lines = 0;
   var errors = 0;
   final tasks = <Task>[];
@@ -68,8 +75,8 @@ Future<void> writeSampleCsv(String path, int count) async {
       final status = _sampleStatuses[i % _sampleStatuses.length];
       final number = i % _sampleIdRange;
       final hours = 1 + i % _sampleMaxHours;
-      final priority = 1 + i % 5;
-      final broken = i % 20 == 19;
+      final priority = Priority.values[i % Priority.values.length].level;
+      final broken = i % _sampleBrokenEvery == _sampleBrokenEvery - 1;
       sink.writeln(
         '$project-$number;Завдання $i;$project;'
         '${broken ? 'x' : priority};2026-09-01;2026-12-01;$status;$hours',
