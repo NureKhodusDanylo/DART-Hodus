@@ -114,9 +114,12 @@ WEB-101;Верстка головної сторінки;WEB;3;2026-09-01;2026-1
 ## Вивід `dart analyze`
 
 ```
-Analyzing task_planner...
+$ dart analyze
+Analyzing lab1...
 No issues found!
 ```
+
+`dart test`: `00:00 +8: All tests passed!`
 
 ## Відповідність пунктам завдання
 
