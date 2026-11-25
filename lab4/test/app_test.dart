@@ -226,4 +226,32 @@ void main() {
       },
     );
   });
+
+  group('фільтри запитів', () {
+    test(
+      'loadFiltered поєднує фільтри стану й мінімального пріоритету',
+      () async {
+        final store = InMemoryTaskStore(_seed);
+        final open = await loadFiltered(store, status: 'in_progress');
+        expect(open.map((t) => t.id), ['WEB-102', 'MOB-203', 'API-303']);
+        final urgent = await loadFiltered(
+          store,
+          status: 'in_progress',
+          minPriority: 4,
+        );
+        expect(urgent.map((t) => t.id), ['WEB-102', 'MOB-203']);
+        expect(await loadFiltered(store, project: 'NOPE'), isEmpty);
+      },
+    );
+
+    test('GET /tasks з нечисловим minPriority повертає 400', () async {
+      final handler = buildHandler(InMemoryTaskStore(_seed), log: (_) {});
+      final response = await handler(
+        Request('GET', Uri.parse('http://localhost/tasks?minPriority=abc')),
+      );
+      expect(response.statusCode, 400);
+      final body = jsonDecode(await response.readAsString());
+      expect(body, {'error': 'minPriority має бути числом'});
+    });
+  });
 }

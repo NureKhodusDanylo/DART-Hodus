@@ -13,7 +13,7 @@ dart pub get
 dart run bin/task_planner.dart init        # створити data/tasks.json з вбудованих даних
 dart run bin/task_planner.dart --help      # довідка
 dart run bin/server.dart                   # HTTP-сервіс на http://127.0.0.1:8080
-dart test                                  # 38 тестів
+dart test                                  # 40 тестів
 dart compile exe bin/task_planner.dart -o build/task_planner.exe
 ```
 
@@ -63,7 +63,7 @@ lib/src/cli/              buildArgParser, runCli, коди завершення
 lib/src/server/           buildRouter, requestLogger, buildHandler
 lib/src/async/, report/   код ЛР3 і звіти
 example/async_demo.dart   демонстрація асинхронності з ЛР3
-test/                     38 тестів
+test/                     40 тестів
 ```
 
 **Чому так.** Код у `bin/` неможливо імпортувати, отже й протестувати, тому там лише
@@ -118,7 +118,7 @@ Analyzing lab4...
 No issues found!
 
 $ dart test
-00:00 +38: All tests passed!
+00:00 +40: All tests passed!
 ```
 
 ## Секрети
