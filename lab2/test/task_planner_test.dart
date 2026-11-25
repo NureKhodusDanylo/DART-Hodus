@@ -77,4 +77,39 @@ void main() {
       expect((done, open), (3, 10));
     });
   });
+
+  group('перелічення і запечатані стани', () {
+    test('Priority.fromLevel: рівні 1–5 існують, решта — null', () {
+      expect(Priority.values.map((p) => p.level), [1, 2, 3, 4, 5]);
+      expect(Priority.fromLevel(4), Priority.high);
+      expect(Priority.fromLevel(0), isNull);
+      expect(Priority.fromLevel(6), isNull);
+      expect(Priority.values.where((p) => p.isHigh), [
+        Priority.high,
+        Priority.critical,
+      ]);
+    });
+
+    test('TaskStatus.tryParse повертає підтип за кодом', () {
+      expect(TaskStatus.tryParse('todo'), isA<Todo>());
+      expect(TaskStatus.tryParse('in_progress'), isA<InProgress>());
+      expect(TaskStatus.tryParse('done'), isA<Done>());
+      expect(TaskStatus.tryParse('blocked'), isA<Blocked>());
+      expect(TaskStatus.tryParse('review'), isNull);
+      expect(const Done().isFinished && !const Blocked().isFinished, isTrue);
+    });
+
+    test('досягнута віха не вважається простроченою', () {
+      final m = Milestone(
+        'M-2',
+        'Демо',
+        DateTime.utc(2026, 10, 10),
+        reached: true,
+      );
+      final now = DateTime.utc(2026, 10, 15);
+      expect(m.daysLeft(now), -5);
+      expect(m.isClosed, isTrue);
+      expect(m.isOverdue(now), isFalse);
+    });
+  });
 }

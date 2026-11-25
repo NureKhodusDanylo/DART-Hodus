@@ -95,6 +95,6 @@ Analyzing lab2...
 No issues found!
 ```
 
-`dart test`: `00:00 +11: All tests passed!`
+`dart test`: `00:00 +14: All tests passed!`
 
 `dart fix --dry-run` — `Nothing to fix!`.
