@@ -125,4 +125,39 @@ void main() {
       },
     );
   });
+
+  group('конвеєри потоків', () {
+    test('where → map → take відбирає перші дві зміни стану', () async {
+      final events = Stream<TaskEvent>.fromIterable(const [
+        TaskDeleted('DOC-402'),
+        StatusChanged('WEB-102', InProgress(), Done()),
+        TaskDeleted('API-302'),
+        StatusChanged('API-305', Blocked(), InProgress()),
+        StatusChanged('MOB-202', Todo(), InProgress()),
+      ]);
+      await expectLater(
+        events.where((e) => e is StatusChanged).map((e) => e.taskId).take(2),
+        emitsInOrder(['WEB-102', 'API-305', emitsDone]),
+      );
+    });
+
+    test(
+      'широкомовне джерело: два слухачі, подія до підписки губиться',
+      () async {
+        final source = TaskEventSource(broadcast: true)
+          ..emit(const TaskDeleted('ДО-ПІДПИСКИ'));
+        final a = <String>[];
+        final b = <String>[];
+        final subA = source.stream.listen((e) => a.add(e.taskId));
+        final subB = source.stream.listen((e) => b.add(e.taskId));
+        source.emit(const TaskDeleted('API-302'));
+        await Future<void>.delayed(Duration.zero);
+        expect(a, ['API-302']);
+        expect(b, ['API-302']);
+        await subA.cancel();
+        await subB.cancel();
+        await source.close();
+      },
+    );
+  });
 }

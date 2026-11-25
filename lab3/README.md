@@ -14,7 +14,7 @@
 dart pub get
 dart run          # демонстрація: 11 розділів, приблизно 10 секунд
 dart analyze
-dart test         # 22 тести, з них 11 — на асинхронний код
+dart test         # 24 тести, з них 13 — на асинхронний код
 ```
 
 > Якщо шлях до проєкту містить кириличні символи, `dart test` у Dart 3.13 завершується
@@ -83,5 +83,5 @@ Analyzing lab3...
 No issues found!
 
 $ dart test
-00:00 +22: All tests passed!
+00:00 +24: All tests passed!
 ```
